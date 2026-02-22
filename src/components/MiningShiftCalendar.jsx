@@ -1,31 +1,94 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, createContext, useContext } from "react";
 
-/* ─── Configuración de Turnos ─── */
+/* ═══════════════════════════════════════════
+   SISTEMA DE TEMAS — Claro / Oscuro (iOS Deep Blue)
+   ═══════════════════════════════════════════ */
+const themes = {
+  light: {
+    bg: "#f8f9fb",
+    card: "#fff",
+    cardBorder: "#e5e7eb",
+    headerBg: "#fff",
+    headerBorder: "#e5e7eb",
+    text: "#111827",
+    textSecondary: "#6b7280",
+    textMuted: "#9ca3af",
+    textDay: "#334155",
+    textWeekend: "#94a3b8",
+    logoBg: "#1e293b",
+    logoText: "#fff",
+    btnBg: "#fff",
+    btnBorder: "#e5e7eb",
+    btnText: "#374151",
+    btnActiveBg: "#2563eb",
+    btnActiveText: "#fff",
+    hoverBg: "#f1f5f9",
+    todayBg: "#eff6ff",
+    todayBorder: "#3b82f6",
+    selectedBg: "#2563eb",
+    selectedText: "#fff",
+    barDescanso: "#e2e8f0",
+    barDescansoText: "#9ca3af",
+    progressBg: "#f1f5f9",
+    footerBorder: "#e5e7eb",
+    toggleBg: "#f1f5f9",
+    toggleActive: "#1e293b",
+    toggleActiveText: "#fff",
+    toggleInactiveText: "#6b7280",
+    descansoCardBg: "#f0fdf4",
+    descansoBorder: "#d1fae5",
+    noche: { dot: "#475569", barBg: "#1e293b", barText: "#fff", badge: "#1e293b", badgeText: "#fff" },
+    dia: { dot: "#2563eb", barBg: "#2563eb", barText: "#fff", badge: "#2563eb", badgeText: "#fff" },
+    descanso: { dot: "#10b981", barBg: null, barText: null, badge: null, badgeText: "#10b981" },
+  },
+  dark: {
+    bg: "#0a1628",
+    card: "rgba(255,255,255,0.05)",
+    cardBorder: "rgba(255,255,255,0.08)",
+    headerBg: "rgba(10,22,40,0.92)",
+    headerBorder: "rgba(255,255,255,0.06)",
+    text: "#f5f5f7",
+    textSecondary: "#98a2b3",
+    textMuted: "#5b6578",
+    textDay: "#e5e7eb",
+    textWeekend: "#5b6578",
+    logoBg: "#0a84ff",
+    logoText: "#fff",
+    btnBg: "rgba(255,255,255,0.07)",
+    btnBorder: "rgba(255,255,255,0.1)",
+    btnText: "#e5e7eb",
+    btnActiveBg: "#0a84ff",
+    btnActiveText: "#fff",
+    hoverBg: "rgba(255,255,255,0.08)",
+    todayBg: "rgba(10,132,255,0.15)",
+    todayBorder: "#0a84ff",
+    selectedBg: "#0a84ff",
+    selectedText: "#fff",
+    barDescanso: "rgba(255,255,255,0.06)",
+    barDescansoText: "#5b6578",
+    progressBg: "rgba(255,255,255,0.06)",
+    footerBorder: "rgba(255,255,255,0.06)",
+    toggleBg: "rgba(255,255,255,0.07)",
+    toggleActive: "#0a84ff",
+    toggleActiveText: "#fff",
+    toggleInactiveText: "#5b6578",
+    descansoCardBg: "rgba(48,209,88,0.1)",
+    descansoBorder: "rgba(48,209,88,0.2)",
+    noche: { dot: "#bf5af2", barBg: "linear-gradient(135deg, #1c1c4e, #2d1b69)", barText: "#e5d4ff", badge: "#2d1b69", badgeText: "#bf5af2" },
+    dia: { dot: "#ff9f0a", barBg: "linear-gradient(135deg, #ff9f0a, #e08600)", barText: "#1a1a1a", badge: "#3a2800", badgeText: "#ff9f0a" },
+    descanso: { dot: "#30d158", barBg: null, barText: null, badge: null, badgeText: "#30d158" },
+  },
+};
+
+const ThemeContext = createContext();
+
+/* ═══════════════════════════════════════════
+   CONFIGURACIÓN DE TURNOS
+   ═══════════════════════════════════════════ */
 const SHIFT_TYPES = {
-  NOCHE: {
-    label: "Turno Noche",
-    short: "N",
-    hours: "20:00 – 08:00",
-    dot: "#475569",
-    barBg: "#1e293b",
-    barText: "#fff",
-  },
-  DIA: {
-    label: "Turno Día",
-    short: "D",
-    hours: "08:00 – 20:00",
-    dot: "#2563eb",
-    barBg: "#2563eb",
-    barText: "#fff",
-  },
-  DESCANSO: {
-    label: "Descanso",
-    short: "—",
-    hours: "Libre",
-    dot: "#10b981",
-    barBg: "#e2e8f0",
-    barText: "#9ca3af",
-  },
+  NOCHE: { label: "Turno Noche", short: "N", hours: "20:00 – 08:00" },
+  DIA: { label: "Turno Día", short: "D", hours: "08:00 – 20:00" },
+  DESCANSO: { label: "Descanso", short: "—", hours: "Libre" },
 };
 
 const MONTHS_ES = [
@@ -34,13 +97,9 @@ const MONTHS_ES = [
 ];
 const DAYS_ES = ["Lu", "Ma", "Mi", "Ju", "Vi", "Sá", "Do"];
 
-/* ─── Lógica del Ciclo 28 días ───
- *  Ancla: 18 Feb 2026 = Día 0 del ciclo
- *  [0..6]   → NOCHE
- *  [7..13]  → DESCANSO
- *  [14..20] → DIA
- *  [21..27] → DESCANSO
- */
+/* ═══════════════════════════════════════════
+   LÓGICA DEL CICLO 28 DÍAS
+   ═══════════════════════════════════════════ */
 function getShiftForDate(date) {
   const d = new Date(date.getFullYear(), date.getMonth(), date.getDate());
   const anchor = new Date(2026, 1, 18);
@@ -52,99 +111,87 @@ function getShiftForDate(date) {
   return "DESCANSO";
 }
 
-/* ─── Utilidades ─── */
-function getDaysInMonth(y, m) {
-  return new Date(y, m + 1, 0).getDate();
+function getDaysInMonth(y, m) { return new Date(y, m + 1, 0).getDate(); }
+function getFirstDayOfWeek(y, m) { const d = new Date(y, m, 1).getDay(); return d === 0 ? 6 : d - 1; }
+function isToday(y, m, d) { const n = new Date(); return n.getFullYear() === y && n.getMonth() === m && n.getDate() === d; }
+function getShiftColors(t) { return { NOCHE: t.noche, DIA: t.dia, DESCANSO: t.descanso }; }
+
+/* ═══════════════════════════════════════════
+   COMPONENTE: Toggle de Tema
+   ═══════════════════════════════════════════ */
+function ThemeToggle({ mode, setMode }) {
+  const t = useContext(ThemeContext);
+  return (
+    <div style={{
+      display: "flex", background: t.toggleBg, borderRadius: 10,
+      padding: 3, gap: 2, border: `1px solid ${t.cardBorder}`,
+    }}>
+      {[
+        { key: "light", label: "☀️" },
+        { key: "dark", label: "🌙" },
+      ].map(({ key, label }) => (
+        <button
+          key={key}
+          onClick={() => setMode(key)}
+          style={{
+            padding: "5px 14px", borderRadius: 8, border: "none",
+            fontSize: 14, cursor: "pointer", transition: "all 0.25s ease",
+            background: mode === key ? t.toggleActive : "transparent",
+            color: mode === key ? t.toggleActiveText : t.toggleInactiveText,
+            fontWeight: 600,
+          }}
+        >{label}</button>
+      ))}
+    </div>
+  );
 }
 
-function getFirstDayOfWeek(y, m) {
-  const d = new Date(y, m, 1).getDay();
-  return d === 0 ? 6 : d - 1; // Lunes = 0
-}
-
-function isToday(y, m, d) {
-  const n = new Date();
-  return n.getFullYear() === y && n.getMonth() === m && n.getDate() === d;
-}
-
-/* ─── Componente: Mes del Calendario ─── */
+/* ═══════════════════════════════════════════
+   COMPONENTE: Mes del Calendario
+   ═══════════════════════════════════════════ */
 function CalendarMonth({ year, month, selectedDate, onSelect }) {
+  const t = useContext(ThemeContext);
+  const sc = getShiftColors(t);
+
   const daysInMonth = getDaysInMonth(year, month);
   const firstDay = getFirstDayOfWeek(year, month);
   const cells = [];
 
-  for (let i = 0; i < firstDay; i++) {
-    cells.push(<td key={`e${i}`} />);
-  }
+  for (let i = 0; i < firstDay; i++) cells.push(<td key={`e${i}`} />);
 
   for (let day = 1; day <= daysInMonth; day++) {
     const shift = getShiftForDate(new Date(year, month, day));
-    const info = SHIFT_TYPES[shift];
+    const colors = sc[shift];
     const today = isToday(year, month, day);
-    const sel =
-      selectedDate &&
-      selectedDate.getFullYear() === year &&
-      selectedDate.getMonth() === month &&
-      selectedDate.getDate() === day;
+    const sel = selectedDate && selectedDate.getFullYear() === year &&
+      selectedDate.getMonth() === month && selectedDate.getDate() === day;
     const isWeekend = [5, 6].includes((firstDay + day - 1) % 7);
 
     cells.push(
-      <td
-        key={day}
-        onClick={() => onSelect(new Date(year, month, day))}
-        style={{ padding: 0, textAlign: "center", verticalAlign: "top" }}
-      >
+      <td key={day} onClick={() => onSelect(new Date(year, month, day))}
+        style={{ padding: 0, textAlign: "center", verticalAlign: "top" }}>
         <div
           style={{
-            position: "relative",
-            margin: 2,
-            padding: "6px 2px 8px",
-            borderRadius: 6,
-            cursor: "pointer",
-            background: sel ? "#2563eb" : today ? "#f0f4ff" : "transparent",
-            border:
-              today && !sel
-                ? "1px solid #2563eb"
-                : "1px solid transparent",
-            transition: "all 0.15s ease",
+            position: "relative", margin: 2, padding: "7px 2px 9px",
+            borderRadius: 10, cursor: "pointer",
+            background: sel ? t.selectedBg : today ? t.todayBg : "transparent",
+            border: today && !sel ? `1.5px solid ${t.todayBorder}` : "1.5px solid transparent",
+            transition: "all 0.2s ease",
           }}
-          onMouseEnter={(e) => {
-            if (!sel) e.currentTarget.style.background = "#f1f5f9";
-          }}
-          onMouseLeave={(e) => {
-            if (!sel)
-              e.currentTarget.style.background = today
-                ? "#f0f4ff"
-                : "transparent";
-          }}
+          onMouseEnter={e => { if (!sel) e.currentTarget.style.background = t.hoverBg; }}
+          onMouseLeave={e => { if (!sel) e.currentTarget.style.background = today ? t.todayBg : "transparent"; }}
         >
-          <div
-            style={{
-              fontSize: 12,
-              fontWeight: today || sel ? 700 : 500,
-              color: sel
-                ? "#fff"
-                : today
-                ? "#2563eb"
-                : isWeekend
-                ? "#94a3b8"
-                : "#334155",
-              lineHeight: 1,
-              marginBottom: 4,
-            }}
-          >
-            {day}
-          </div>
-          <div
-            style={{
-              width: 7,
-              height: 7,
-              borderRadius: "50%",
-              background: sel ? "#fff" : info.dot,
-              margin: "0 auto",
-              opacity: shift === "DESCANSO" ? 0.5 : 1,
-            }}
-          />
+          <div style={{
+            fontSize: 13, fontWeight: today || sel ? 700 : 400,
+            color: sel ? t.selectedText : today ? t.todayBorder : isWeekend ? t.textWeekend : t.textDay,
+            lineHeight: 1, marginBottom: 5,
+            letterSpacing: -0.2,
+          }}>{day}</div>
+          <div style={{
+            width: 6, height: 6, borderRadius: "50%",
+            background: sel ? t.selectedText : colors.dot,
+            margin: "0 auto", opacity: shift === "DESCANSO" ? 0.45 : 0.9,
+          }} />
         </div>
       </td>
     );
@@ -154,61 +201,34 @@ function CalendarMonth({ year, month, selectedDate, onSelect }) {
   let week = [];
   cells.forEach((c, i) => {
     week.push(c);
-    if (week.length === 7) {
-      rows.push(<tr key={i}>{week}</tr>);
-      week = [];
-    }
+    if (week.length === 7) { rows.push(<tr key={i}>{week}</tr>); week = []; }
   });
   while (week.length < 7) week.push(<td key={`f${week.length}`} />);
   if (week.length) rows.push(<tr key="last">{week}</tr>);
 
   return (
-    <div
-      style={{
-        background: "#fff",
-        borderRadius: 10,
-        border: "1px solid #e5e7eb",
-        padding: "16px 14px 12px",
-        minWidth: 260,
-        flex: "1 1 280px",
-        maxWidth: 320,
-      }}
-    >
-      <div
-        style={{
-          fontSize: 14,
-          fontWeight: 700,
-          color: "#111827",
-          marginBottom: 12,
-          letterSpacing: -0.3,
-        }}
-      >
+    <div style={{
+      background: t.card, borderRadius: 16,
+      border: `1px solid ${t.cardBorder}`,
+      padding: "18px 16px 14px", minWidth: 260,
+      flex: "1 1 280px", maxWidth: 320,
+      backdropFilter: "blur(20px)",
+    }}>
+      <div style={{
+        fontSize: 15, fontWeight: 700, color: t.text,
+        marginBottom: 14, letterSpacing: -0.3,
+      }}>
         {MONTHS_ES[month]}{" "}
-        <span style={{ color: "#9ca3af", fontWeight: 500 }}>{year}</span>
+        <span style={{ color: t.textMuted, fontWeight: 400 }}>{year}</span>
       </div>
-      <table
-        style={{
-          width: "100%",
-          borderCollapse: "collapse",
-          tableLayout: "fixed",
-        }}
-      >
+      <table style={{ width: "100%", borderCollapse: "collapse", tableLayout: "fixed" }}>
         <thead>
           <tr>
-            {DAYS_ES.map((d) => (
-              <th
-                key={d}
-                style={{
-                  fontSize: 10,
-                  fontWeight: 600,
-                  color: "#9ca3af",
-                  padding: "0 0 6px",
-                  textTransform: "uppercase",
-                  letterSpacing: 0.8,
-                }}
-              >
-                {d}
-              </th>
+            {DAYS_ES.map(d => (
+              <th key={d} style={{
+                fontSize: 11, fontWeight: 600, color: t.textMuted,
+                padding: "0 0 8px", textTransform: "uppercase", letterSpacing: 0.5,
+              }}>{d}</th>
             ))}
           </tr>
         </thead>
@@ -218,56 +238,39 @@ function CalendarMonth({ year, month, selectedDate, onSelect }) {
   );
 }
 
-/* ─── Componente: Detalle del Día Seleccionado ─── */
+/* ═══════════════════════════════════════════
+   COMPONENTE: Detalle del Día
+   ═══════════════════════════════════════════ */
 function ShiftDetail({ date }) {
+  const t = useContext(ThemeContext);
+  const sc = getShiftColors(t);
+
   if (!date) return null;
   const shift = getShiftForDate(date);
   const info = SHIFT_TYPES[shift];
-  const dayNames = [
-    "Domingo", "Lunes", "Martes", "Miércoles",
-    "Jueves", "Viernes", "Sábado",
-  ];
+  const colors = sc[shift];
+  const dayNames = ["Domingo", "Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado"];
 
   return (
-    <div
-      style={{
-        background: "#fff",
-        borderRadius: 10,
-        border: "1px solid #e5e7eb",
-        padding: "16px 20px",
-        display: "flex",
-        alignItems: "center",
-        gap: 14,
-      }}
-    >
-      <div
-        style={{
-          width: 44,
-          height: 44,
-          borderRadius: 10,
-          background:
-            shift === "NOCHE"
-              ? "#1e293b"
-              : shift === "DIA"
-              ? "#2563eb"
-              : "#f0fdf4",
-          border: shift === "DESCANSO" ? "1px solid #d1fae5" : "none",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          fontSize: 16,
-          fontWeight: 800,
-          color: shift === "DESCANSO" ? "#10b981" : "#fff",
-          flexShrink: 0,
-        }}
-      >
-        {info.short}
-      </div>
+    <div style={{
+      background: t.card, borderRadius: 16,
+      border: `1px solid ${t.cardBorder}`,
+      padding: "18px 22px", display: "flex",
+      alignItems: "center", gap: 16,
+      backdropFilter: "blur(20px)",
+    }}>
+      <div style={{
+        width: 48, height: 48, borderRadius: 14,
+        background: shift === "DESCANSO" ? t.descansoCardBg : (colors.badge || t.card),
+        border: shift === "DESCANSO" ? `1px solid ${t.descansoBorder}` : "none",
+        display: "flex", alignItems: "center", justifyContent: "center",
+        fontSize: 18, fontWeight: 700, color: colors.badgeText, flexShrink: 0,
+      }}>{info.short}</div>
       <div style={{ flex: 1 }}>
-        <div style={{ fontSize: 14, fontWeight: 700, color: "#111827" }}>
+        <div style={{ fontSize: 16, fontWeight: 600, color: t.text, letterSpacing: -0.3 }}>
           {info.label}
         </div>
-        <div style={{ fontSize: 12, color: "#6b7280", marginTop: 2 }}>
+        <div style={{ fontSize: 13, color: t.textSecondary, marginTop: 3, letterSpacing: -0.1 }}>
           {dayNames[date.getDay()]} {date.getDate()} de{" "}
           {MONTHS_ES[date.getMonth()]} {date.getFullYear()} · {info.hours}
         </div>
@@ -276,12 +279,15 @@ function ShiftDetail({ date }) {
   );
 }
 
-/* ─── Componente: Estadísticas ─── */
+/* ═══════════════════════════════════════════
+   COMPONENTE: Estadísticas
+   ═══════════════════════════════════════════ */
 function StatsRow({ months }) {
+  const t = useContext(ThemeContext);
+  const sc = getShiftColors(t);
+
   const stats = useMemo(() => {
-    let n = 0,
-      d = 0,
-      r = 0;
+    let n = 0, d = 0, r = 0;
     months.forEach(({ year, month }) => {
       const days = getDaysInMonth(year, month);
       for (let i = 1; i <= days; i++) {
@@ -295,93 +301,30 @@ function StatsRow({ months }) {
   }, [months]);
 
   const items = [
-    {
-      label: "Días Noche",
-      val: stats.noche,
-      color: "#475569",
-      pct: ((stats.noche / stats.total) * 100).toFixed(0),
-    },
-    {
-      label: "Días Día",
-      val: stats.dia,
-      color: "#2563eb",
-      pct: ((stats.dia / stats.total) * 100).toFixed(0),
-    },
-    {
-      label: "Descanso",
-      val: stats.descanso,
-      color: "#10b981",
-      pct: ((stats.descanso / stats.total) * 100).toFixed(0),
-    },
-    {
-      label: "Días Trabajo",
-      val: stats.trabajo,
-      color: "#111827",
-      pct: ((stats.trabajo / stats.total) * 100).toFixed(0),
-    },
+    { label: "Días Noche", val: stats.noche, color: sc.NOCHE.dot, pct: ((stats.noche / stats.total) * 100).toFixed(0) },
+    { label: "Días Día", val: stats.dia, color: sc.DIA.dot, pct: ((stats.dia / stats.total) * 100).toFixed(0) },
+    { label: "Descanso", val: stats.descanso, color: sc.DESCANSO.dot, pct: ((stats.descanso / stats.total) * 100).toFixed(0) },
+    { label: "Días Trabajo", val: stats.trabajo, color: t.text, pct: ((stats.trabajo / stats.total) * 100).toFixed(0) },
   ];
 
   return (
-    <div
-      style={{
-        display: "grid",
-        gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))",
-        gap: 10,
-      }}
-    >
-      {items.map((s) => (
-        <div
-          key={s.label}
-          style={{
-            background: "#fff",
-            borderRadius: 10,
-            border: "1px solid #e5e7eb",
-            padding: "14px 16px",
-          }}
-        >
-          <div
-            style={{
-              fontSize: 10,
-              color: "#9ca3af",
-              textTransform: "uppercase",
-              letterSpacing: 1,
-              fontWeight: 600,
-              marginBottom: 4,
-            }}
-          >
-            {s.label}
-          </div>
+    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: 10 }}>
+      {items.map(s => (
+        <div key={s.label} style={{
+          background: t.card, borderRadius: 16,
+          border: `1px solid ${t.cardBorder}`, padding: "16px 18px",
+          backdropFilter: "blur(20px)",
+        }}>
+          <div style={{
+            fontSize: 11, color: t.textMuted, textTransform: "uppercase",
+            letterSpacing: 0.8, fontWeight: 600, marginBottom: 6,
+          }}>{s.label}</div>
           <div style={{ display: "flex", alignItems: "baseline", gap: 6 }}>
-            <span
-              style={{
-                fontSize: 24,
-                fontWeight: 800,
-                color: s.color,
-                lineHeight: 1,
-              }}
-            >
-              {s.val}
-            </span>
-            <span style={{ fontSize: 11, color: "#9ca3af" }}>{s.pct}%</span>
+            <span style={{ fontSize: 28, fontWeight: 700, color: s.color, lineHeight: 1, letterSpacing: -1 }}>{s.val}</span>
+            <span style={{ fontSize: 12, color: t.textMuted, fontWeight: 500 }}>{s.pct}%</span>
           </div>
-          <div
-            style={{
-              marginTop: 8,
-              height: 3,
-              background: "#f1f5f9",
-              borderRadius: 2,
-              overflow: "hidden",
-            }}
-          >
-            <div
-              style={{
-                height: "100%",
-                width: `${s.pct}%`,
-                background: s.color,
-                borderRadius: 2,
-                transition: "width 0.4s ease",
-              }}
-            />
+          <div style={{ marginTop: 10, height: 4, background: t.progressBg, borderRadius: 2, overflow: "hidden" }}>
+            <div style={{ height: "100%", width: `${s.pct}%`, background: s.color, borderRadius: 2, transition: "width 0.5s ease" }} />
           </div>
         </div>
       ))}
@@ -389,30 +332,24 @@ function StatsRow({ months }) {
   );
 }
 
-/* ─── Componente: Timeline de Bloques ─── */
+/* ═══════════════════════════════════════════
+   COMPONENTE: Timeline de Bloques
+   ═══════════════════════════════════════════ */
 function TimelineBar({ months }) {
+  const t = useContext(ThemeContext);
+  const sc = getShiftColors(t);
+
   return (
-    <div
-      style={{
-        background: "#fff",
-        borderRadius: 10,
-        border: "1px solid #e5e7eb",
-        padding: "16px 20px",
-      }}
-    >
-      <div
-        style={{
-          fontSize: 11,
-          fontWeight: 700,
-          color: "#111827",
-          marginBottom: 12,
-          textTransform: "uppercase",
-          letterSpacing: 1,
-        }}
-      >
-        Vista de Bloques
-      </div>
-      <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+    <div style={{
+      background: t.card, borderRadius: 16,
+      border: `1px solid ${t.cardBorder}`, padding: "18px 22px",
+      backdropFilter: "blur(20px)",
+    }}>
+      <div style={{
+        fontSize: 11, fontWeight: 700, color: t.text,
+        marginBottom: 14, textTransform: "uppercase", letterSpacing: 0.8,
+      }}>Vista de Bloques</div>
+      <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
         {months.map(({ year, month }) => {
           const daysInMonth = getDaysInMonth(year, month);
           const blocks = [];
@@ -420,58 +357,33 @@ function TimelineBar({ months }) {
           for (let d = 1; d <= daysInMonth; d++) {
             const s = getShiftForDate(new Date(year, month, d));
             if (cur && cur.shift === s) cur.end = d;
-            else {
-              if (cur) blocks.push(cur);
-              cur = { shift: s, start: d, end: d };
-            }
+            else { if (cur) blocks.push(cur); cur = { shift: s, start: d, end: d }; }
           }
           if (cur) blocks.push(cur);
 
           return (
-            <div
-              key={`${year}-${month}`}
-              style={{ display: "flex", alignItems: "center", gap: 10 }}
-            >
-              <span
-                style={{
-                  fontSize: 10,
-                  color: "#9ca3af",
-                  width: 28,
-                  textAlign: "right",
-                  fontWeight: 600,
-                  flexShrink: 0,
-                }}
-              >
+            <div key={`${year}-${month}`} style={{ display: "flex", alignItems: "center", gap: 10 }}>
+              <span style={{
+                fontSize: 11, color: t.textMuted, width: 30,
+                textAlign: "right", fontWeight: 600, flexShrink: 0,
+              }}>
                 {MONTHS_ES[month].slice(0, 3).toUpperCase()}
               </span>
-              <div
-                style={{
-                  flex: 1,
-                  display: "flex",
-                  gap: 2,
-                  height: 22,
-                  borderRadius: 4,
-                  overflow: "hidden",
-                }}
-              >
+              <div style={{
+                flex: 1, display: "flex", gap: 2,
+                height: 24, borderRadius: 6, overflow: "hidden",
+              }}>
                 {blocks.map((b, i) => {
-                  const info = SHIFT_TYPES[b.shift];
+                  const colors = sc[b.shift];
                   const span = b.end - b.start + 1;
                   return (
-                    <div
-                      key={i}
-                      style={{
-                        flex: span,
-                        background: info.barBg,
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        fontSize: 9,
-                        fontWeight: 700,
-                        letterSpacing: 0.3,
-                        color: info.barText,
-                      }}
-                    >
+                    <div key={i} style={{
+                      flex: span,
+                      background: colors.barBg || t.barDescanso,
+                      display: "flex", alignItems: "center", justifyContent: "center",
+                      fontSize: 9, fontWeight: 700, letterSpacing: 0.3,
+                      color: colors.barText || t.barDescansoText,
+                    }}>
                       {span >= 4 ? `${b.start}–${b.end}` : ""}
                     </div>
                   );
@@ -485,41 +397,40 @@ function TimelineBar({ months }) {
   );
 }
 
-/* ─── Componente Principal ─── */
+/* ═══════════════════════════════════════════
+   COMPONENTE PRINCIPAL
+   ═══════════════════════════════════════════ */
 export default function MiningShiftCalendar() {
+  const [mode, setMode] = useState(() => {
+    if (typeof window !== "undefined" && window.matchMedia("(prefers-color-scheme: dark)").matches) {
+      return "dark";
+    }
+    return "light";
+  });
   const [baseMonth, setBaseMonth] = useState(() => {
     const now = new Date();
     return { year: now.getFullYear(), month: now.getMonth() };
   });
   const [selectedDate, setSelectedDate] = useState(new Date());
 
+  const t = themes[mode];
+
   const months = useMemo(() => {
     const r = [];
-    let y = baseMonth.year,
-      m = baseMonth.month;
+    let y = baseMonth.year, m = baseMonth.month;
     for (let i = 0; i < 6; i++) {
       r.push({ year: y, month: m });
       m++;
-      if (m > 11) {
-        m = 0;
-        y++;
-      }
+      if (m > 11) { m = 0; y++; }
     }
     return r;
   }, [baseMonth]);
 
   const nav = (dir) => {
-    setBaseMonth((p) => {
-      let m = p.month + dir * 3,
-        y = p.year;
-      while (m < 0) {
-        m += 12;
-        y--;
-      }
-      while (m > 11) {
-        m -= 12;
-        y++;
-      }
+    setBaseMonth(p => {
+      let m = p.month + dir * 3, y = p.year;
+      while (m < 0) { m += 12; y--; }
+      while (m > 11) { m -= 12; y++; }
       return { year: y, month: m };
     });
   };
@@ -531,30 +442,36 @@ export default function MiningShiftCalendar() {
   };
 
   const btnBase = {
-    background: "#fff",
-    border: "1px solid #e5e7eb",
-    color: "#374151",
-    borderRadius: 6,
-    padding: "7px 14px",
-    fontSize: 12,
+    background: t.btnBg,
+    border: `1px solid ${t.btnBorder}`,
+    color: t.btnText,
+    borderRadius: 10,
+    padding: "8px 16px",
+    fontSize: 13,
     fontWeight: 600,
     cursor: "pointer",
-    transition: "all 0.15s",
+    transition: "all 0.2s ease",
+    fontFamily: "inherit",
+    letterSpacing: -0.2,
   };
 
   return (
-    <div style={{ minHeight: "100vh", background: "#f8f9fb" }}>
-      <link
-        href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&display=swap"
-        rel="stylesheet"
-      />
+    <ThemeContext.Provider value={t}>
+      <div style={{
+        minHeight: "100vh",
+        background: t.bg,
+        fontFamily: "-apple-system, BlinkMacSystemFont, 'SF Pro Display', 'SF Pro Text', 'Helvetica Neue', sans-serif",
+        color: t.text,
+        transition: "background 0.35s ease, color 0.35s ease",
+        WebkitFontSmoothing: "antialiased",
+        MozOsxFontSmoothing: "grayscale",
+      }}>
 
-      {/* ── Header ── */}
-      <div
-        style={{
-          background: "#fff",
-          borderBottom: "1px solid #e5e7eb",
-          padding: "12px 24px",
+        {/* ── Header Sticky ── */}
+        <div style={{
+          background: t.headerBg,
+          borderBottom: `1px solid ${t.headerBorder}`,
+          padding: "14px 24px",
           display: "flex",
           alignItems: "center",
           justifyContent: "space-between",
@@ -563,157 +480,110 @@ export default function MiningShiftCalendar() {
           position: "sticky",
           top: 0,
           zIndex: 50,
-        }}
-      >
-        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-          <div
-            style={{
-              width: 36,
-              height: 36,
-              borderRadius: 8,
-              background: "#1e293b",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              fontSize: 13,
-              fontWeight: 800,
-              color: "#fff",
-              letterSpacing: -0.5,
-            }}
-          >
-            SG
-          </div>
-          <div>
-            <div
-              style={{
-                fontSize: 15,
-                fontWeight: 700,
-                color: "#111827",
-                letterSpacing: -0.3,
-              }}
-            >
-              Sierra Gorda SCM
-            </div>
-            <div style={{ fontSize: 11, color: "#9ca3af" }}>
-              Calendario de Turnos · Rotación 7×7
+          backdropFilter: "blur(20px)",
+          WebkitBackdropFilter: "blur(20px)",
+        }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+            <div style={{
+              width: 38, height: 38, borderRadius: 10,
+              background: t.logoBg,
+              display: "flex", alignItems: "center", justifyContent: "center",
+              fontSize: 14, fontWeight: 800, color: t.logoText, letterSpacing: -0.5,
+            }}>SG</div>
+            <div>
+              <div style={{ fontSize: 16, fontWeight: 700, color: t.text, letterSpacing: -0.4 }}>
+                Sierra Gorda SCM
+              </div>
+              <div style={{ fontSize: 12, color: t.textMuted, letterSpacing: -0.1 }}>
+                Calendario de Turnos · Rotación 7×7
+              </div>
             </div>
           </div>
+          <div style={{ display: "flex", gap: 14, alignItems: "center", flexWrap: "wrap" }}>
+            {[
+              { l: "Noche", c: t.noche.dot },
+              { l: "Día", c: t.dia.dot },
+              { l: "Descanso", c: t.descanso.dot },
+            ].map(x => (
+              <div key={x.l} style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                <span style={{
+                  width: 8, height: 8, borderRadius: "50%",
+                  background: x.c, display: "inline-block",
+                }} />
+                <span style={{ fontSize: 12, color: t.textSecondary, fontWeight: 500, letterSpacing: -0.1 }}>
+                  {x.l}
+                </span>
+              </div>
+            ))}
+            <ThemeToggle mode={mode} setMode={setMode} />
+          </div>
         </div>
-        <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
-          {[
-            { l: "Noche", c: "#475569" },
-            { l: "Día", c: "#2563eb" },
-            { l: "Descanso", c: "#10b981" },
-          ].map((x) => (
-            <div
-              key={x.l}
-              style={{ display: "flex", alignItems: "center", gap: 5 }}
-            >
-              <span
-                style={{
-                  width: 8,
-                  height: 8,
-                  borderRadius: "50%",
-                  background: x.c,
-                  display: "inline-block",
-                }}
-              />
-              <span style={{ fontSize: 11, color: "#6b7280", fontWeight: 500 }}>
-                {x.l}
-              </span>
-            </div>
-          ))}
-        </div>
-      </div>
 
-      {/* ── Contenido ── */}
-      <div style={{ maxWidth: 1100, margin: "0 auto", padding: "20px 16px" }}>
-        {/* Navegación */}
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            marginBottom: 16,
-            flexWrap: "wrap",
-            gap: 8,
-          }}
-        >
-          <div style={{ display: "flex", gap: 6 }}>
-            <button onClick={() => nav(-1)} style={btnBase}>
-              ← Anterior
-            </button>
-            <button
-              onClick={goToday}
-              style={{
+        {/* ── Contenido ── */}
+        <div style={{ maxWidth: 1100, margin: "0 auto", padding: "22px 16px" }}>
+
+          {/* Navegación */}
+          <div style={{
+            display: "flex", alignItems: "center",
+            justifyContent: "space-between", marginBottom: 18,
+            flexWrap: "wrap", gap: 8,
+          }}>
+            <div style={{ display: "flex", gap: 6 }}>
+              <button onClick={() => nav(-1)} style={btnBase}>← Anterior</button>
+              <button onClick={goToday} style={{
                 ...btnBase,
-                background: "#2563eb",
-                color: "#fff",
-                border: "1px solid #2563eb",
-              }}
-            >
-              Hoy
-            </button>
-            <button onClick={() => nav(1)} style={btnBase}>
-              Siguiente →
-            </button>
+                background: t.btnActiveBg,
+                color: t.btnActiveText,
+                border: `1px solid ${t.btnActiveBg}`,
+              }}>Hoy</button>
+              <button onClick={() => nav(1)} style={btnBase}>Siguiente →</button>
+            </div>
+            <div style={{ fontSize: 14, color: t.textSecondary, fontWeight: 600, letterSpacing: -0.2 }}>
+              {MONTHS_ES[months[0].month]} {months[0].year} — {MONTHS_ES[months[5].month]} {months[5].year}
+            </div>
           </div>
-          <div style={{ fontSize: 13, color: "#6b7280", fontWeight: 600 }}>
-            {MONTHS_ES[months[0].month]} {months[0].year} —{" "}
-            {MONTHS_ES[months[5].month]} {months[5].year}
+
+          {/* Detalle día */}
+          <div style={{ marginBottom: 16 }}>
+            <ShiftDetail date={selectedDate} />
           </div>
-        </div>
 
-        {/* Detalle día seleccionado */}
-        <div style={{ marginBottom: 16 }}>
-          <ShiftDetail date={selectedDate} />
-        </div>
+          {/* Stats */}
+          <div style={{ marginBottom: 16 }}>
+            <StatsRow months={months} />
+          </div>
 
-        {/* Estadísticas */}
-        <div style={{ marginBottom: 16 }}>
-          <StatsRow months={months} />
-        </div>
+          {/* Timeline */}
+          <div style={{ marginBottom: 22 }}>
+            <TimelineBar months={months} />
+          </div>
 
-        {/* Timeline */}
-        <div style={{ marginBottom: 20 }}>
-          <TimelineBar months={months} />
-        </div>
+          {/* Calendarios */}
+          <div style={{
+            display: "flex", flexWrap: "wrap",
+            gap: 12, justifyContent: "center",
+          }}>
+            {months.map(({ year, month }) => (
+              <CalendarMonth
+                key={`${year}-${month}`}
+                year={year}
+                month={month}
+                selectedDate={selectedDate}
+                onSelect={setSelectedDate}
+              />
+            ))}
+          </div>
 
-        {/* Grilla de calendarios */}
-        <div
-          style={{
-            display: "flex",
-            flexWrap: "wrap",
-            gap: 12,
-            justifyContent: "center",
-          }}
-        >
-          {months.map(({ year, month }) => (
-            <CalendarMonth
-              key={`${year}-${month}`}
-              year={year}
-              month={month}
-              selectedDate={selectedDate}
-              onSelect={setSelectedDate}
-            />
-          ))}
-        </div>
-
-        {/* Footer */}
-        <div
-          style={{
-            textAlign: "center",
-            marginTop: 28,
-            paddingTop: 16,
-            borderTop: "1px solid #e5e7eb",
-            fontSize: 11,
-            color: "#9ca3af",
-          }}
-        >
-          Ciclo 28 días: 7 Noche → 7 Descanso → 7 Día → 7 Descanso · Fecha
-          ancla: 18 Feb 2026 (Noche)
+          {/* Footer */}
+          <div style={{
+            textAlign: "center", marginTop: 30, paddingTop: 18,
+            borderTop: `1px solid ${t.footerBorder}`,
+            fontSize: 12, color: t.textMuted, letterSpacing: -0.1,
+          }}>
+            Ciclo 28 días: 7 Noche → 7 Descanso → 7 Día → 7 Descanso · Fecha ancla: 18 Feb 2026 (Noche)
+          </div>
         </div>
       </div>
-    </div>
+    </ThemeContext.Provider>
   );
 }
